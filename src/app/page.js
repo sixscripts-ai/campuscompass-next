@@ -97,8 +97,7 @@ const CourseCard = ({ course, showScore = false, onOpenMap }) => {
         )}
 
       <div className="card-description">
-        {course.description?.substring(0, 200)}
-        {course.description?.length > 200 ? "..." : ""}
+        {course.description || "No description available."}
       </div>
 
       {showScore && course.match_reason && (
