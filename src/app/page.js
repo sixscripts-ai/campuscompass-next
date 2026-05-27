@@ -3,14 +3,56 @@
 import { useState, useRef, useEffect } from "react";
 
 /* ──────────────────────────────────────────────
+   Map Modal Component
+   ────────────────────────────────────────────── */
+const MapModal = ({ isOpen, onClose, locationQuery, collegeName }) => {
+  if (!isOpen) return null;
+  const encodedQuery = encodeURIComponent(locationQuery);
+  const mapUrl = `https://maps.google.com/maps?q=${encodedQuery}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="map-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>🗺️ {collegeName} Campus Map</h3>
+          <button className="close-btn" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">
+          <iframe
+            width="100%"
+            height="100%"
+            style={{ border: 0, borderRadius: '16px' }}
+            loading="lazy"
+            allowFullScreen
+            referrerPolicy="no-referrer-when-downgrade"
+            src={mapUrl}
+          ></iframe>
+        </div>
+        <div className="modal-footer">
+          <a
+            href={`https://maps.google.com/maps?q=${encodedQuery}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="maps-btn"
+          >
+            Open in Google Maps <i className="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ──────────────────────────────────────────────
    Reusable Course Card
    ────────────────────────────────────────────── */
-const CourseCard = ({ course, showScore = false }) => {
+const CourseCard = ({ course, showScore = false, onOpenMap }) => {
   const isMiraCosta = course.college?.toLowerCase().includes("miracosta");
   const cardClass = isMiraCosta ? "course-card miracosta" : "course-card chico";
-  const mapsLink = isMiraCosta
-    ? "https://maps.google.com/maps?q=MiraCosta+College+Oceanside+CA"
-    : "https://maps.google.com/maps?q=California+State+University+Chico+CA";
+  const collegeName = isMiraCosta ? "MiraCosta College" : "CSU Chico";
+  const mapQuery = isMiraCosta 
+    ? "MiraCosta College Oceanside CA" 
+    : "California State University Chico CA";
 
   return (
     <div className={cardClass}>
@@ -23,6 +65,7 @@ const CourseCard = ({ course, showScore = false }) => {
           {isMiraCosta ? "MiraCosta" : "CSU Chico"}
         </div>
       </div>
+
 
       <div className="card-badges">
         <div className="badge">
@@ -65,15 +108,13 @@ const CourseCard = ({ course, showScore = false }) => {
       )}
 
       <div className="card-action">
-        <a
-          href={mapsLink}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={() => onOpenMap(mapQuery, collegeName)}
           className="maps-btn"
         >
           <i className="fa-solid fa-map-location-dot"></i>
           View Campus Location
-        </a>
+        </button>
       </div>
     </div>
   );
@@ -92,7 +133,7 @@ const StatCard = ({ number, label, color }) => (
 /* ──────────────────────────────────────────────
    TAB: AI Chat
    ────────────────────────────────────────────── */
-function AIChatTab() {
+function AIChatTab({ onOpenMap }) {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -242,7 +283,7 @@ function AIChatTab() {
         </header>
         <div className="cards-container">
           {activeCards.length > 0 ? (
-            activeCards.map((c, i) => <CourseCard key={i} course={c} />)
+            activeCards.map((c, i) => <CourseCard key={i} course={c} onOpenMap={onOpenMap} />)
           ) : (
             <div className="empty-state">
               <i className="fa-solid fa-layer-group"></i>
@@ -261,17 +302,19 @@ function AIChatTab() {
 /* ──────────────────────────────────────────────
    TAB: Search
    ────────────────────────────────────────────── */
-function SearchTab() {
+function SearchTab({ onOpenMap }) {
   const [query, setQuery] = useState("");
   const [college, setCollege] = useState("");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isSemantic, setIsSemantic] = useState(false);
 
   const doSearch = async () => {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/search", {
+      const endpoint = isSemantic ? "/api/semantic-search" : "/api/search";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, college: college || null }),
@@ -309,6 +352,13 @@ function SearchTab() {
           <option value="MiraCosta College">MiraCosta College</option>
           <option value="California State University, Chico">CSU Chico</option>
         </select>
+        
+        <label className="toggle-switch">
+          <input type="checkbox" checked={isSemantic} onChange={(e) => setIsSemantic(e.target.checked)} />
+          <span className="slider"></span>
+          <span className="toggle-label">AI Semantic Search ✨</span>
+        </label>
+
         <button className="glass-btn" onClick={doSearch} disabled={loading}>
           {loading ? "Searching..." : "🔍 Search"}
         </button>
@@ -338,7 +388,7 @@ function SearchTab() {
                 Found <strong>{results.length}</strong> courses for &ldquo;{query}&rdquo;
               </div>
               {results.map((c, i) => (
-                <CourseCard key={i} course={c} showScore />
+                <CourseCard key={i} course={c} showScore onOpenMap={onOpenMap} />
               ))}
             </>
           )}
@@ -357,7 +407,7 @@ function SearchTab() {
 /* ──────────────────────────────────────────────
    TAB: Recommendations
    ────────────────────────────────────────────── */
-function RecommendationsTab() {
+function RecommendationsTab({ onOpenMap }) {
   const [interests, setInterests] = useState("");
   const [college, setCollege] = useState("");
   const [recs, setRecs] = useState(null);
@@ -431,7 +481,7 @@ function RecommendationsTab() {
                 📚 Courses for &ldquo;{interest.charAt(0).toUpperCase() + interest.slice(1)}&rdquo;
               </h3>
               {courses.map((c, i) => (
-                <CourseCard key={i} course={c} showScore />
+                <CourseCard key={i} course={c} showScore onOpenMap={onOpenMap} />
               ))}
             </div>
           ))}
@@ -456,7 +506,7 @@ const SUBJECTS = [
   "Physics", "Political Science", "Psychology", "Sociology",
 ];
 
-function SubjectTab() {
+function SubjectTab({ onOpenMap }) {
   const [subject, setSubject] = useState("");
   const [college, setCollege] = useState("");
   const [data, setData] = useState(null);
@@ -528,7 +578,7 @@ function SubjectTab() {
               <StatCard number={data.chico} label="CSU Chico" color="#ef4444" />
             </div>
             {data.courses.map((c, i) => (
-              <CourseCard key={i} course={c} showScore />
+              <CourseCard key={i} course={c} showScore onOpenMap={onOpenMap} />
             ))}
           </>
         )}
@@ -547,7 +597,7 @@ function SubjectTab() {
 /* ──────────────────────────────────────────────
    TAB: Prerequisites
    ────────────────────────────────────────────── */
-function PrerequisitesTab() {
+function PrerequisitesTab({ onOpenMap }) {
   const [code, setCode] = useState("");
   const [college, setCollege] = useState("");
   const [data, setData] = useState(null);
@@ -617,13 +667,13 @@ function PrerequisitesTab() {
         {data && !loading && data.target_course && (
           <>
             <div className="results-count">🎯 Target Course</div>
-            <CourseCard course={data.target_course} showScore />
+            <CourseCard course={data.target_course} showScore onOpenMap={onOpenMap} />
 
             {data.prerequisites.length > 0 ? (
               <>
                 <div className="results-count prereq-title">📋 Required Prerequisites ({data.prerequisites.length})</div>
                 {data.prerequisites.map((c, i) => (
-                  <CourseCard key={i} course={c} showScore />
+                  <CourseCard key={i} course={c} showScore onOpenMap={onOpenMap} />
                 ))}
               </>
             ) : data.target_course.prerequisites &&
@@ -667,26 +717,41 @@ const TABS = [
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("chat");
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [mapQuery, setMapQuery] = useState("");
+  const [mapCollege, setMapCollege] = useState("");
+
+  const handleOpenMap = (query, college) => {
+    setMapQuery(query);
+    setMapCollege(college);
+    setIsMapOpen(true);
+  };
 
   const renderTab = () => {
     switch (activeTab) {
       case "chat":
-        return <AIChatTab />;
+        return <AIChatTab onOpenMap={handleOpenMap} />;
       case "search":
-        return <SearchTab />;
+        return <SearchTab onOpenMap={handleOpenMap} />;
       case "recs":
-        return <RecommendationsTab />;
+        return <RecommendationsTab onOpenMap={handleOpenMap} />;
       case "subjects":
-        return <SubjectTab />;
+        return <SubjectTab onOpenMap={handleOpenMap} />;
       case "prereqs":
-        return <PrerequisitesTab />;
+        return <PrerequisitesTab onOpenMap={handleOpenMap} />;
       default:
-        return <AIChatTab />;
+        return <AIChatTab onOpenMap={handleOpenMap} />;
     }
   };
 
   return (
     <>
+      <MapModal
+        isOpen={isMapOpen}
+        onClose={() => setIsMapOpen(false)}
+        locationQuery={mapQuery}
+        collegeName={mapCollege}
+      />
       <div className="background-orbs">
         <div className="orb orb-1"></div>
         <div className="orb orb-2"></div>
